@@ -10,10 +10,13 @@ public:
 
 	PELoader(MemoryLocation image);
 
+	HMODULE getImageBase() const;
+
 private:  
 	PEParser m_parser;  
 	MemoryLocation m_image_base = nullptr;
 
 	void allocateImageMemory();
 	void copyHeadersToMemory();
+	void copySectionsToMemory();
 };

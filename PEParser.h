@@ -7,7 +7,13 @@
 class PEParser
 {
 public:
-	PEParser(MemoryLocation image_base);
+	enum class ImageLocation
+	{
+		FILE = 0,
+		MEMORY = 1
+	};
+public:
+	PEParser(MemoryLocation image_base, ImageLocation location);
 	~PEParser() = default;
 	PEParser(const PEParser&) = delete;
 	PEParser& operator=(const PEParser&) = delete;
@@ -22,11 +28,14 @@ public:
 
 	RVA FileOffsetToRVA(FileOffset fileOffset);
 	FileOffset RVAToFileOffset(RVA rva);
+	MemoryLocation FileOffsetToMemory(FileOffset fileOffset);
+	MemoryLocation RVAToMemory(RVA rva);
 
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptors();
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptor(std::string dll_name);
 
 private:
 	MemoryLocation m_base = nullptr;
+	ImageLocation m_location;
 };
 

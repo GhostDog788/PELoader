@@ -3,8 +3,13 @@
 
 
 PELoader::PELoader(MemoryLocation image)
-	: m_parser(image)
+	: m_parser(image, PEParser::ImageLocation::FILE)
 {
+}
+
+HMODULE PELoader::getImageBase() const
+{
+	return reinterpret_cast<HMODULE>(m_image_base);
 }
 
 void PELoader::allocateImageMemory()
@@ -32,15 +37,29 @@ void PELoader::copyHeadersToMemory()
 	memcpy(m_image_base, m_parser.getDosHeader(), m_parser.getNtHeaders()->OptionalHeader.SizeOfHeaders);
 }
 
+void PELoader::copySectionsToMemory()
+{
+	for (auto section : m_parser.getSections())
+	{
+		auto section_data = reinterpret_cast<MemoryLocation>(m_parser.FileOffsetToMemory(section->PointerToRawData));
+		auto section_destination = reinterpret_cast<MemoryLocation>(m_image_base + section->VirtualAddress);
+		memcpy(section_destination, section_data, section->SizeOfRawData);
+
+		DWORD oldProtect;
+		VirtualProtect(section_destination, section->SizeOfRawData, section->Characteristics, &oldProtect);
+	}
+}
+
 HMODULE PELoader::loadLibrary(MemoryLocation image)
 {
 	PELoader loader(image);
 	loader.allocateImageMemory();
 	loader.copyHeadersToMemory();
+	loader.copySectionsToMemory();
 
 	// [V] allocate memory for the entire image as R/W
 	// [V] copy headers: DOS , NT, sections
-	// [ ] copy each section to memory, change permissions to characteristics
+	// [V] copy each section to memory, change permissions to characteristics
 	// 
 	// [ ] resolve imports
 	// [ ] resolve relocations
@@ -49,5 +68,5 @@ HMODULE PELoader::loadLibrary(MemoryLocation image)
 	// 
 	// [ ] call entry point
 
-	return reinterpret_cast<HMODULE>(loader.m_parser.getDosHeader()); // equal to returning 'image'
+	return loader.getImageBase();
 }

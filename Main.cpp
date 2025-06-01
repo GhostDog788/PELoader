@@ -8,12 +8,13 @@
 int main()
 {
 	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\TestDLL.dll";
-	//LoadLibrary(filename);
 	try {
 		Buffer buffer = IoUtils::readFile(filename);
+		//auto lib = LoadLibrary(filename);
 		auto lib = PELoader::loadLibrary(buffer.data());
 
-		PEParser parser(reinterpret_cast<MemoryLocation>(lib));
+		PEParser parser(reinterpret_cast<MemoryLocation>(lib), PEParser::ImageLocation::MEMORY);
+		auto desceiptor = parser.getImportDescriptors();
 		int x = 5;
 	}
 	catch (const ParserException& e) {

@@ -2,8 +2,8 @@
 #include "HandleGuard.h"
 #include "ParserException.h"
 
-PEParser::PEParser(MemoryLocation image_base)
-	: m_base(image_base)
+PEParser::PEParser(MemoryLocation image_base, ImageLocation location)
+	: m_base(image_base), m_location(location)
 {
 }
 
@@ -87,10 +87,26 @@ FileOffset PEParser::RVAToFileOffset(RVA rva)
 	throw ParserException("RVA not found in any section");
 }
 
+MemoryLocation PEParser::FileOffsetToMemory(FileOffset fileOffset)
+{
+	if (m_location == ImageLocation::MEMORY) {
+		return m_base + FileOffsetToRVA(fileOffset);
+	}
+	return m_base + fileOffset;
+}
+
+MemoryLocation PEParser::RVAToMemory(RVA rva)
+{
+	if (m_location == ImageLocation::FILE) {
+		return m_base + RVAToFileOffset(rva);
+	}
+	return m_base + rva;
+}
+
 IMAGE_IMPORT_DESCRIPTOR* PEParser::getImportDescriptors()
 {
-	FileOffset offset = getDataDirectory(IMAGE_DIRECTORY_ENTRY_IMPORT)->VirtualAddress;
-	return reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(m_base + offset);
+	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_IMPORT)->VirtualAddress);
+	return reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(location);
 }
 
 IMAGE_IMPORT_DESCRIPTOR* PEParser::getImportDescriptor(std::string dll_name)
