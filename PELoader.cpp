@@ -18,7 +18,7 @@ void PELoader::allocateImageMemory()
 	auto image_size = m_file_parser.getNtHeaders()->OptionalHeader.SizeOfImage;
 	auto image_base = m_file_parser.getNtHeaders()->OptionalHeader.ImageBase;
 	auto new_image_base = VirtualAlloc(
-		reinterpret_cast<void*>(image_base),
+		reinterpret_cast<void*>(image_base + 0x10000000), // test relocations
 		image_size,
 		MEM_RESERVE | MEM_COMMIT,
 		PAGE_READWRITE
@@ -26,9 +26,6 @@ void PELoader::allocateImageMemory()
 
 	if (new_image_base == nullptr) {
 		throw std::runtime_error("Failed to allocate memory for the image");
-	}
-	else if (new_image_base != reinterpret_cast<void*>(image_base)) {
-		throw std::runtime_error("Failed to allocate memory at the specified image base");
 	}
 	m_image_base = reinterpret_cast<MemoryLocation>(new_image_base);
 	m_memory_parser = PEParser(m_image_base, PEParser::ImageLocation::MEMORY);
@@ -100,6 +97,48 @@ void PELoader::resolveImports()
 	VirtualProtect(iat_in_memory, iat_directory->Size, oldProtect, &oldProtect);
 }
 
+void PELoader::resolveRelocations()
+{
+	IMAGE_DATA_DIRECTORY* relocations_directory = m_memory_parser.getDataDirectory(IMAGE_DIRECTORY_ENTRY_BASERELOC);
+	MemoryLocation reloc_base = m_memory_parser.RVAToMemory(relocations_directory->VirtualAddress);
+	MemoryLocation reloc_end = reloc_base + relocations_directory->Size;
+#ifdef _WIN64
+	QWORD delta = reinterpret_cast<QWORD>(m_image_base) - m_memory_parser.getNtHeaders()->OptionalHeader.ImageBase;
+#else
+	DWORD delta = reinterpret_cast<DWORD>(m_image_base) - m_memory_parser.getNtHeaders()->OptionalHeader.ImageBase;
+#endif
+	if (delta == 0) {
+		return; // No relocations to process
+	}
+
+	while (reloc_base < reloc_end) {
+		auto reloc = reinterpret_cast<IMAGE_BASE_RELOCATION*>(reloc_base);
+		DWORD count = (reloc->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
+		WORD* relocData = (WORD*)(reloc + 1);
+
+		DWORD oldProtect;
+		VirtualProtect(m_image_base + reloc->VirtualAddress, reloc->SizeOfBlock, PAGE_READWRITE, &oldProtect);
+		for (DWORD i = 0; i < count; i++) {
+			WORD type = relocData[i] >> 12;
+			WORD offset = relocData[i] & 0x0FFF;
+
+			if (type == IMAGE_REL_BASED_HIGHLOW) {
+				DWORD* patchAddr = (DWORD*)(m_image_base + reloc->VirtualAddress + offset);
+				*patchAddr += delta;
+			}
+			else if (type == IMAGE_REL_BASED_DIR64) {
+#ifdef _WIN64
+				QWORD* patchAddr = (QWORD*)(m_image_base + reloc->VirtualAddress + offset);
+				*patchAddr += delta;
+#endif
+			}
+		}
+		VirtualProtect(m_image_base + reloc->VirtualAddress, reloc->SizeOfBlock, oldProtect, &oldProtect);
+
+		reloc_base += reloc->SizeOfBlock;
+	}
+}
+
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
 {
 	using DllMainFunc = BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID);
@@ -140,13 +179,14 @@ HMODULE PELoader::loadLibrary(MemoryLocation image)
 	loader.copyHeadersToMemory();
 	loader.copySectionsToMemory();
 	loader.resolveImports();
+	loader.resolveRelocations();
 
 	// [V] allocate memory for the entire image as R/W
 	// [V] copy headers: DOS , NT, sections
 	// [V] copy each section to memory, change permissions to characteristics
 	// 
 	// [V] resolve imports
-	// [ ] resolve relocations
+	// [V] resolve relocations
 	// [ ] resolve exports
 	// [ ] resolve exception handlers
 	// 

@@ -21,6 +21,7 @@ private:
 	void copyHeadersToMemory();
 	void copySectionsToMemory();
 	void resolveImports();
+	void resolveRelocations();
 
 
 	void callEntryPoint(DWORD ul_reason_for_call);
