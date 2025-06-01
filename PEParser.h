@@ -30,6 +30,8 @@ public:
 	FileOffset RVAToFileOffset(RVA rva);
 	MemoryLocation FileOffsetToMemory(FileOffset fileOffset);
 	MemoryLocation RVAToMemory(RVA rva);
+	RVA MemoryToRVA(MemoryLocation memory);
+	FileOffset MemoryToFileOffset(MemoryLocation memory);
 
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptors();
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptor(std::string dll_name);

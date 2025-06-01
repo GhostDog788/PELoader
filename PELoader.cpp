@@ -50,18 +50,60 @@ void PELoader::copySectionsToMemory()
 	}
 }
 
+void PELoader::resolveImports()
+{
+	auto iat_directory = m_parser.getDataDirectory(IMAGE_DIRECTORY_ENTRY_IAT);
+	auto iat_in_memory = m_parser.RVAToMemory(iat_directory->VirtualAddress);
+	DWORD oldProtect;
+	VirtualProtect(iat_in_memory, iat_directory->Size, PAGE_READWRITE, &oldProtect);
+
+
+	auto descriptor = m_parser.getImportDescriptors();
+	while (descriptor->Name != 0)
+	{
+		auto dll_name = reinterpret_cast<LPCSTR>(m_parser.RVAToMemory(descriptor->Name));
+		auto lib = LoadLibraryA(dll_name);
+		if (lib == nullptr) {
+			throw std::runtime_error("Failed to load library: " + std::string(dll_name));
+		}
+		auto import_address_table = reinterpret_cast<IMAGE_THUNK_DATA*>(m_parser.RVAToMemory(descriptor->FirstThunk));
+		auto import_name_table = reinterpret_cast<IMAGE_THUNK_DATA*>(m_parser.RVAToMemory(descriptor->OriginalFirstThunk));
+		for (size_t i = 0; import_name_table[i].u1.AddressOfData != 0; ++i)
+		{
+			FARPROC function_address = nullptr;
+			if (IMAGE_SNAP_BY_ORDINAL(import_name_table[i].u1.Ordinal)) {
+				auto ordinal = IMAGE_ORDINAL(import_name_table[i].u1.Ordinal);
+				// Resolve the ordinal import here
+			}
+			else {
+				auto import_by_name = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(m_parser.RVAToMemory(import_name_table[i].u1.ForwarderString));
+				function_address = GetProcAddress(lib, import_by_name->Name);
+			}
+#ifdef _WIN64
+			import_address_table[i].u1.AddressOfData = reinterpret_cast<QWORD>(function_address);
+#else
+			import_address_table[i].u1.AddressOfData = reinterpret_cast<DWORD>(function_address);
+#endif
+		}
+		descriptor++;
+	}
+
+	VirtualProtect(iat_in_memory, iat_directory->Size, oldProtect, &oldProtect);
+}
+
 HMODULE PELoader::loadLibrary(MemoryLocation image)
 {
 	PELoader loader(image);
 	loader.allocateImageMemory();
 	loader.copyHeadersToMemory();
 	loader.copySectionsToMemory();
+	loader.resolveImports();
 
 	// [V] allocate memory for the entire image as R/W
 	// [V] copy headers: DOS , NT, sections
 	// [V] copy each section to memory, change permissions to characteristics
 	// 
-	// [ ] resolve imports
+	// [V] resolve imports
 	// [ ] resolve relocations
 	// [ ] resolve exports
 	// [ ] resolve exception handlers

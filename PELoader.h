@@ -19,4 +19,5 @@ private:
 	void allocateImageMemory();
 	void copyHeadersToMemory();
 	void copySectionsToMemory();
+	void resolveImports();
 };

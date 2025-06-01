@@ -103,6 +103,22 @@ MemoryLocation PEParser::RVAToMemory(RVA rva)
 	return m_base + rva;
 }
 
+RVA PEParser::MemoryToRVA(MemoryLocation memory)
+{
+	if (m_location == ImageLocation::FILE) {
+		return FileOffsetToRVA(memory - m_base);
+	}
+	return memory - m_base;
+}
+
+FileOffset PEParser::MemoryToFileOffset(MemoryLocation memory)
+{
+	if (m_location == ImageLocation::MEMORY) {
+		return RVAToFileOffset(memory - m_base);
+	}
+	return memory - m_base;
+}
+
 IMAGE_IMPORT_DESCRIPTOR* PEParser::getImportDescriptors()
 {
 	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_IMPORT)->VirtualAddress);
