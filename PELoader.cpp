@@ -104,11 +104,9 @@ void PELoader::callEntryPoint(DWORD ul_reason_for_call)
 {
 	using DllMainFunc = BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID);
 
-	PEParser memory_parser(m_image_base, PEParser::ImageLocation::MEMORY);
-	auto address = m_image_base + memory_parser.getNtHeaders()->OptionalHeader.AddressOfEntryPoint;
+	auto address = m_image_base + m_memory_parser.getNtHeaders()->OptionalHeader.AddressOfEntryPoint;
 	DllMainFunc dllMain = reinterpret_cast<DllMainFunc>(address);
-	auto desc = memory_parser.getImportDescriptor("USER32.dll");
-	DWORD message_box = reinterpret_cast<IMAGE_THUNK_DATA*>(memory_parser.RVAToMemory(desc->FirstThunk))->u1.AddressOfData;
+
 	dllMain(reinterpret_cast<HINSTANCE>(address), ul_reason_for_call, nullptr);
 }
 
