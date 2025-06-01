@@ -7,7 +7,7 @@
 
 int main()
 {
-	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\TestDLL.dll";
+	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\CDLL.dll";
 	try {
 		Buffer buffer = IoUtils::readFile(filename);
 		//auto lib = LoadLibrary(filename);

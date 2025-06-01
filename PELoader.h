@@ -13,11 +13,17 @@ public:
 	HMODULE getImageBase() const;
 
 private:  
-	PEParser m_parser;  
+	PEParser m_file_parser;
+	PEParser m_memory_parser;
 	MemoryLocation m_image_base = nullptr;
 
 	void allocateImageMemory();
 	void copyHeadersToMemory();
 	void copySectionsToMemory();
 	void resolveImports();
+
+
+	void callEntryPoint(DWORD ul_reason_for_call);
+
+	static DWORD sectionCharacteristicsToProtect(DWORD characteristics);
 };
