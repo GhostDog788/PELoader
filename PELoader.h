@@ -7,6 +7,7 @@
 class PELoader {  
 public:  
 	static HMODULE loadLibrary(MemoryLocation image);
+	static FARPROC getProcAddress(HMODULE image, LPCSTR proc_name);
 
 	PELoader(MemoryLocation image);
 

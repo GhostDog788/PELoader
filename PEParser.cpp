@@ -138,3 +138,9 @@ IMAGE_IMPORT_DESCRIPTOR* PEParser::getImportDescriptor(std::string dll_name)
 	}
 	throw ParserException("Import descriptor not found for DLL: " + dll_name);
 }
+
+IMAGE_EXPORT_DIRECTORY* PEParser::getExportDirectory()
+{
+	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT)->VirtualAddress);
+	return reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(location);
+}

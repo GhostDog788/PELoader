@@ -195,3 +195,60 @@ HMODULE PELoader::loadLibrary(MemoryLocation image)
 
 	return loader.getImageBase();
 }
+
+FARPROC PELoader::getProcAddress(HMODULE image, LPCSTR proc_name)
+{
+	// optional = mimic windows loader and check if module is loaded
+	PEParser parser(reinterpret_cast<MemoryLocation>(image), PEParser::ImageLocation::MEMORY);
+	IMAGE_EXPORT_DIRECTORY* export_directory = parser.getExportDirectory();
+	if (export_directory == nullptr) {
+		throw std::runtime_error("Export directory not found");
+	}
+	DWORD* names = reinterpret_cast<DWORD*>(parser.RVAToMemory(export_directory->AddressOfNames));
+	DWORD* functions = reinterpret_cast<DWORD*>(parser.RVAToMemory(export_directory->AddressOfFunctions));
+	WORD* ordinals = reinterpret_cast<WORD*>(parser.RVAToMemory(export_directory->AddressOfNameOrdinals));
+
+	bool is_ordinal = ((reinterpret_cast<uintptr_t>(proc_name) >> 16) == 0);
+
+	DWORD func_index = -1;
+	if (is_ordinal) {
+		WORD ord =  reinterpret_cast<WORD>(proc_name);
+		if (ord < export_directory->Base || ord >= export_directory->Base + export_directory->NumberOfFunctions) {
+			return nullptr;
+		}
+		func_index = ord - export_directory->Base;
+	}
+	else {
+		for (DWORD i = 0; i < export_directory->NumberOfNames; ++i) {
+			const char* func_name = reinterpret_cast<char*>(parser.RVAToMemory(names[i]));
+			if (strcmp(func_name, proc_name) == 0) {
+				func_index = ordinals[i];
+				break;
+			}
+		}
+		if (func_index == DWORD(-1)) return nullptr;
+	}
+
+	DWORD rva = functions[func_index];
+	// forwarder support
+	auto export_pointer = parser.getDataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT);
+	bool isForwarder = rva >= export_pointer->VirtualAddress && rva < export_pointer->VirtualAddress + export_pointer->Size;
+	if (isForwarder) {
+		std::string forwarder_string(reinterpret_cast<char*>(rva));
+		auto forwarded_dll = forwarder_string.substr(0, forwarder_string.find_first_of('.'));
+		auto forwarded_function = forwarder_string.substr(forwarder_string.find_last_of('.'), forwarder_string.size());
+
+		HMODULE forwarded_module = LoadLibraryA((forwarded_dll + ".dll").c_str());
+		if (!forwarded_module) {
+			return nullptr; // Failed to load the forwarded module
+		}
+
+		if (forwarded_function[0] == '#') {
+			// If the function is an ordinal
+			int ordinal = std::stoi(forwarded_function.substr(1));
+			return GetProcAddress(forwarded_module, MAKEINTRESOURCEA(ordinal));
+		}
+		return getProcAddress(forwarded_module, forwarded_function.c_str());
+	}
+	return reinterpret_cast<FARPROC>(parser.RVAToMemory(rva));
+}
