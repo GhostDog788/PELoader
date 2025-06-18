@@ -36,6 +36,7 @@ public:
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptors();
 	IMAGE_IMPORT_DESCRIPTOR* getImportDescriptor(std::string dll_name);
 	IMAGE_EXPORT_DIRECTORY* getExportDirectory();
+	IMAGE_TLS_DIRECTORY* getTLSDirectory();
 
 private:
 	MemoryLocation m_base = nullptr;

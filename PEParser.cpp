@@ -89,6 +89,7 @@ FileOffset PEParser::RVAToFileOffset(RVA rva)
 
 MemoryLocation PEParser::FileOffsetToMemory(FileOffset fileOffset)
 {
+	if (fileOffset == 0) return nullptr; // Handle zero FileOffset case
 	if (m_location == ImageLocation::MEMORY) {
 		return m_base + FileOffsetToRVA(fileOffset);
 	}
@@ -97,6 +98,7 @@ MemoryLocation PEParser::FileOffsetToMemory(FileOffset fileOffset)
 
 MemoryLocation PEParser::RVAToMemory(RVA rva)
 {
+	if (rva == 0) return nullptr; // Handle zero RVA case
 	if (m_location == ImageLocation::FILE) {
 		return m_base + RVAToFileOffset(rva);
 	}
@@ -143,4 +145,10 @@ IMAGE_EXPORT_DIRECTORY* PEParser::getExportDirectory()
 {
 	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT)->VirtualAddress);
 	return reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(location);
+}
+
+IMAGE_TLS_DIRECTORY* PEParser::getTLSDirectory()
+{
+	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_TLS)->VirtualAddress);
+	auto tls_callback = reinterpret_cast<IMAGE_TLS_DIRECTORY*>(location);
 }

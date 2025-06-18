@@ -139,6 +139,24 @@ void PELoader::resolveRelocations()
 	}
 }
 
+void PELoader::resolveTLS()
+{
+	IMAGE_TLS_DIRECTORY* tls_directory = m_memory_parser.getTLSDirectory();
+	if (tls_directory == nullptr) {
+		return; // No TLS directory found
+	}
+	if (tls_directory->AddressOfCallBacks == 0) {
+		return; // No callbacks to call
+	}
+	auto callback_array = reinterpret_cast<DWORD*>(m_memory_parser.RVAToMemory(tls_directory->AddressOfCallBacks));
+	for (size_t i = 0; callback_array[i] != 0; ++i) {
+		auto callback_address = reinterpret_cast<void*>(callback_array[i]);
+		using TlsCallbackFunc = void(WINAPI*)(DWORD, DWORD, LPVOID);
+		TlsCallbackFunc callback_func = reinterpret_cast<TlsCallbackFunc>(callback_address);
+		callback_func(DLL_PROCESS_ATTACH, 0, nullptr);
+	}
+}
+
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
 {
 	using DllMainFunc = BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID);
