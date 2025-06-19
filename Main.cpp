@@ -7,17 +7,15 @@
 
 int main()
 {
-	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\CDLL.dll";
+	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Debug\\TestDLL.dll";
 	try {
 		Buffer buffer = IoUtils::readFile(filename);
 		//auto lib = LoadLibrary(filename);
 		auto lib = PELoader::loadLibrary(buffer.data());
 
-		PEParser parser(reinterpret_cast<MemoryLocation>(lib), PEParser::ImageLocation::MEMORY);
-		auto desceiptor = parser.getImportDescriptors();
-		auto res = PELoader::getProcAddress(lib, (LPCSTR)3);
-		auto sub = reinterpret_cast<int(*)(int, int)>(res);
-		int x = sub(6, 4);
+		auto res = PELoader::getProcAddress(lib, "TestTls");
+		auto TestTls = reinterpret_cast<void(*)()>(res);
+		TestTls();
 		int y = 5;
 	}
 	catch (const ParserException& e) {

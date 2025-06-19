@@ -150,5 +150,5 @@ IMAGE_EXPORT_DIRECTORY* PEParser::getExportDirectory()
 IMAGE_TLS_DIRECTORY* PEParser::getTLSDirectory()
 {
 	MemoryLocation location = RVAToMemory(getDataDirectory(IMAGE_DIRECTORY_ENTRY_TLS)->VirtualAddress);
-	auto tls_callback = reinterpret_cast<IMAGE_TLS_DIRECTORY*>(location);
+	return reinterpret_cast<IMAGE_TLS_DIRECTORY*>(location);
 }
