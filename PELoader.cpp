@@ -120,9 +120,10 @@ void PELoader::resolveRelocations()
 		DWORD count = (reloc->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
 		WORD* relocData = (WORD*)(reloc + 1);
 
-		DWORD oldProtect;
-		VirtualProtect(m_image_base + reloc->VirtualAddress, pageSize, PAGE_READWRITE, &oldProtect);
-		VirtualProtect(m_image_base + reloc->VirtualAddress + pageSize, pageSize, PAGE_READWRITE, &oldProtect);
+		DWORD oldProtect1;
+		VirtualProtect(m_image_base + reloc->VirtualAddress, pageSize, PAGE_READWRITE, &oldProtect1);
+		DWORD oldProtect2;
+		VirtualProtect(m_image_base + reloc->VirtualAddress + pageSize, pageSize, PAGE_READWRITE, &oldProtect2);
 		// we unprotect BOTH pages to handle address which spans across two pages (FFE, FFF, 000, 001) for
 		// example of a DWORD which starts at offset FFE and end in 001 of the next page
 		for (DWORD i = 0; i < count; i++) {
@@ -140,51 +141,48 @@ void PELoader::resolveRelocations()
 #endif
 			}
 		}
-		VirtualProtect(m_image_base + reloc->VirtualAddress, pageSize, oldProtect, &oldProtect);
-		VirtualProtect(m_image_base + reloc->VirtualAddress + pageSize, pageSize, oldProtect, &oldProtect);
+		VirtualProtect(m_image_base + reloc->VirtualAddress, pageSize, oldProtect1, &oldProtect1);
+		VirtualProtect(m_image_base + reloc->VirtualAddress + pageSize, pageSize, oldProtect2, &oldProtect2);
 
 		reloc_base += reloc->SizeOfBlock;
 	}
 }
 
-void PELoader::resolveTLS()
-{
-	IMAGE_TLS_DIRECTORY* tls_directory = m_memory_parser.getTLSDirectory();
-	if (tls_directory == nullptr) {
-		return; // No TLS directory found
-	}
+void PELoader::resolveTLS()  
+{  
+   IMAGE_TLS_DIRECTORY* tls_directory = m_memory_parser.getTLSDirectory();  
+   if (tls_directory == nullptr) {  
+       return; // No TLS directory found  
+   }  
 
-	DWORD* tls_index = reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex);
-	*tls_index = TlsAlloc();
-	if (*tls_index == TLS_OUT_OF_INDEXES) {
-		throw std::runtime_error("Failed to allocate TLS index");
-	}
-	
-	size_t tls_data_size = tls_directory->SizeOfZeroFill + (tls_directory->EndAddressOfRawData - tls_directory->StartAddressOfRawData);
-	void* tls_data = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, tls_data_size);
-	if (tls_data == nullptr) {
-		throw std::runtime_error("Failed to allocate TLS data");
-	}
-	memcpy(
-		tls_data,
-		reinterpret_cast<void*>(tls_directory->StartAddressOfRawData),
-		tls_data_size - tls_directory->SizeOfZeroFill
-	);
-	DWORD* vars = (DWORD*)tls_data;
-	vars[0] = 0;
-	vars[1] = 100;
-	TlsSetValue(*tls_index, tls_data);
+   DWORD* tls_index = reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex);  
+   *tls_index = TlsAlloc();  
+   if (*tls_index == TLS_OUT_OF_INDEXES) {  
+       throw std::runtime_error("Failed to allocate TLS index");  
+   }  
 
-	auto value = TlsGetValue(*reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex)); // Ensure TLS is initialized
+   size_t tls_data_size = tls_directory->SizeOfZeroFill + (tls_directory->EndAddressOfRawData - tls_directory->StartAddressOfRawData);  
+   void* tls_data = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, tls_data_size);  
+   if (tls_data == nullptr) {  
+       throw std::runtime_error("Failed to allocate TLS data");  
+   }  
+   memcpy(  
+       tls_data,  
+       reinterpret_cast<void*>(tls_directory->StartAddressOfRawData),  
+       tls_data_size - tls_directory->SizeOfZeroFill  
+   );
+   UINT_PTR* ptr_to_tls_ptr = reinterpret_cast<UINT_PTR*>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+   *ptr_to_tls_ptr = reinterpret_cast<DWORD>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1000)); 
+   DWORD* tls_ptr = reinterpret_cast<DWORD*>(*ptr_to_tls_ptr);
+   tls_ptr[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
 
-
-	auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);
-	if (!callbacks)
-		return;
-	for (PIMAGE_TLS_CALLBACK* p = callbacks; *p != nullptr; ++p) {
-		PIMAGE_TLS_CALLBACK callback = *p;
-		callback(m_image_base, DLL_PROCESS_ATTACH, nullptr);
-	}
+   auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);  
+   if (!callbacks)  
+       return;  
+   for (PIMAGE_TLS_CALLBACK* p = callbacks; *p != nullptr; ++p) {  
+       PIMAGE_TLS_CALLBACK callback = *p;  
+       callback(m_image_base, DLL_PROCESS_ATTACH, nullptr);  
+   }  
 }
 
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
