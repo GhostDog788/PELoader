@@ -162,19 +162,25 @@ void PELoader::resolveTLS()
    }  
 
    size_t tls_data_size = tls_directory->SizeOfZeroFill + (tls_directory->EndAddressOfRawData - tls_directory->StartAddressOfRawData);  
-   void* tls_data = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, tls_data_size);  
-   if (tls_data == nullptr) {  
-       throw std::runtime_error("Failed to allocate TLS data");  
-   }  
+
+   void* tls_data = VirtualAlloc(0, tls_data_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+   if (tls_data == nullptr) {
+	   throw std::runtime_error("Failed to allocate TLS data");
+   }
+   ZeroMemory(tls_data, tls_data_size);
    memcpy(  
        tls_data,  
        reinterpret_cast<void*>(tls_directory->StartAddressOfRawData),  
        tls_data_size - tls_directory->SizeOfZeroFill  
    );
-   UINT_PTR* ptr_to_tls_ptr = reinterpret_cast<UINT_PTR*>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
-   *ptr_to_tls_ptr = reinterpret_cast<DWORD>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1000)); 
-   DWORD* tls_ptr = reinterpret_cast<DWORD*>(*ptr_to_tls_ptr);
-   tls_ptr[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
+   auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR*>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+   //auto tls_vector = reinterpret_cast<UINT_PTR*>(VirtualAlloc(0, 1000 * sizeof(UINT_PTR), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+   //if (tls_vector == nullptr) {
+   //   throw std::runtime_error("Failed to allocate TLS vector");
+   //}
+   //ZeroMemory(tls_vector, 1000 * sizeof(UINT_PTR)); // Initialize the TLS vector to zero
+   //*ptr_to_tls_ptr = reinterpret_cast<UINT_PTR>(tls_vector);
+   reinterpret_cast<DWORD*>(*ptr_to_tls_ptr)[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
 
    auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);  
    if (!callbacks)  
