@@ -85,17 +85,13 @@ void PELoader::resolveImports()
 			FARPROC function_address = nullptr;
 			if (IMAGE_SNAP_BY_ORDINAL(import_name_table[i].u1.Ordinal)) {
 				auto ordinal = IMAGE_ORDINAL(import_name_table[i].u1.Ordinal);
-				// Resolve the ordinal import here
+				function_address = getProcAddress(lib, reinterpret_cast<LPCSTR>(ordinal));
 			}
 			else {
 				auto import_by_name = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(m_memory_parser.RVAToMemory(import_name_table[i].u1.ForwarderString));
-				function_address = GetProcAddress(lib, import_by_name->Name);
+				function_address = getProcAddress(lib, import_by_name->Name);
 			}
-#ifdef _WIN64
-			import_address_table[i].u1.AddressOfData = reinterpret_cast<QWORD>(function_address);
-#else
-			import_address_table[i].u1.AddressOfData = reinterpret_cast<DWORD>(function_address);
-#endif
+			import_address_table[i].u1.AddressOfData = reinterpret_cast<UINT_PTR>(function_address);
 		}
 		descriptor++;
 	}
@@ -108,11 +104,7 @@ void PELoader::resolveRelocations()
 	IMAGE_DATA_DIRECTORY* relocations_directory = m_memory_parser.getDataDirectory(IMAGE_DIRECTORY_ENTRY_BASERELOC);
 	MemoryLocation reloc_base = m_memory_parser.RVAToMemory(relocations_directory->VirtualAddress);
 	MemoryLocation reloc_end = reloc_base + relocations_directory->Size;
-#ifdef _WIN64
-	QWORD delta = reinterpret_cast<QWORD>(m_image_base) - m_memory_parser.getNtHeaders()->OptionalHeader.ImageBase;
-#else
-	DWORD delta = reinterpret_cast<DWORD>(m_image_base) - m_memory_parser.getNtHeaders()->OptionalHeader.ImageBase;
-#endif
+	UINT_PTR delta = reinterpret_cast<UINT_PTR>(m_image_base) - m_memory_parser.getNtHeaders()->OptionalHeader.ImageBase;
 	if (delta == 0) {
 		return; // No relocations to process
 	}
@@ -136,15 +128,9 @@ void PELoader::resolveRelocations()
 			WORD type = relocData[i] >> 12;
 			WORD offset = relocData[i] & 0x0FFF;
 
-			if (type == IMAGE_REL_BASED_HIGHLOW) {
-				DWORD* patchAddr = (DWORD*)(m_image_base + reloc->VirtualAddress + offset);
+			if (type == IMAGE_REL_BASED_HIGHLOW || type == IMAGE_REL_BASED_DIR64) {
+				auto patchAddr = reinterpret_cast<PUINT_PTR>(m_image_base + reloc->VirtualAddress + offset);
 				*patchAddr += delta;
-			}
-			else if (type == IMAGE_REL_BASED_DIR64) {
-#ifdef _WIN64
-				QWORD* patchAddr = (QWORD*)(m_image_base + reloc->VirtualAddress + offset);
-				*patchAddr += delta;
-#endif
 			}
 		}
 		VirtualProtect(m_image_base + reloc->VirtualAddress, pageSize, oldProtect1, &oldProtect1);
@@ -317,9 +303,9 @@ FARPROC PELoader::getProcAddress(HMODULE image, LPCSTR proc_name)
 	auto export_pointer = parser.getDataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT);
 	bool isForwarder = rva >= export_pointer->VirtualAddress && rva < export_pointer->VirtualAddress + export_pointer->Size;
 	if (isForwarder) {
-		std::string forwarder_string(reinterpret_cast<char*>(rva));
+		std::string forwarder_string(reinterpret_cast<char*>(reinterpret_cast<UINT_PTR>(image) + rva));
 		auto forwarded_dll = forwarder_string.substr(0, forwarder_string.find_first_of('.'));
-		auto forwarded_function = forwarder_string.substr(forwarder_string.find_last_of('.'), forwarder_string.size());
+		auto forwarded_function = forwarder_string.substr(forwarder_string.find_last_of('.') + 1, forwarder_string.size());
 
 		HMODULE forwarded_module = LoadLibraryA((forwarded_dll + ".dll").c_str());
 		if (!forwarded_module) {
