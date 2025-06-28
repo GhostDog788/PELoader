@@ -2,15 +2,21 @@
 #include <stdexcept>
 
 
-PELoader::PELoader(MemoryLocation image)
-	: m_file_parser(image, PEParser::ImageLocation::FILE)
-	, m_memory_parser(image, PEParser::ImageLocation::MEMORY)
+PELoader::PELoader(MemoryLocation file_image)
+	: m_file_parser(file_image, PEParser::ImageLocation::FILE)
+	, m_memory_parser(nullptr, PEParser::ImageLocation::MEMORY)
 {
 }
 
-HMODULE PELoader::getImageBase() const
+PELoader::PELoader(Module loaded_image)
+	: m_file_parser(nullptr, PEParser::ImageLocation::FILE)
+	, m_memory_parser(reinterpret_cast<MemoryLocation>(loaded_image.get()), PEParser::ImageLocation::MEMORY)
 {
-	return reinterpret_cast<HMODULE>(m_image_base);
+}
+
+PELoader::Module PELoader::getImageBase() const
+{
+	return Module(reinterpret_cast<HMODULE>(m_image_base));
 }
 
 void PELoader::allocateImageMemory()
@@ -239,7 +245,7 @@ DWORD PELoader::sectionCharacteristicsToProtect(DWORD characteristics)
 	return PAGE_NOACCESS;
 }
 
-HMODULE PELoader::loadLibrary(MemoryLocation image)
+PELoader::Module PELoader::loadLibrary(MemoryLocation image)
 {
 	PELoader loader(image);
 	loader.allocateImageMemory();
@@ -265,7 +271,7 @@ HMODULE PELoader::loadLibrary(MemoryLocation image)
 	return loader.getImageBase();
 }
 
-BOOL PELoader::freeLibrary(MemoryLocation image)
+BOOL PELoader::freeLibrary(PELoader::Module image)
 {
 	PELoader loader(image);
 

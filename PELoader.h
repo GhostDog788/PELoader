@@ -4,15 +4,26 @@
 #include "Buffer.h"  
 #include <cstdint>
 
-class PELoader {  
+class PELoader {
+public:
+	class Module
+	{
+	public:
+		explicit Module(HMODULE h = nullptr) noexcept : m_handle(h) {}
+		operator HMODULE() const noexcept { return m_handle; }
+		HMODULE get() const noexcept { return m_handle; } 
+	private:
+		HMODULE m_handle;
+	};
 public:  
-	static HMODULE loadLibrary(MemoryLocation image);
-	static BOOL freeLibrary(MemoryLocation image);
+	static Module loadLibrary(MemoryLocation image);
+	static BOOL freeLibrary(Module image);
 	static FARPROC getProcAddress(HMODULE image, LPCSTR proc_name);
 
-	PELoader(MemoryLocation image);
+	PELoader(MemoryLocation file_image);
+	PELoader(Module loaded_image);
 
-	HMODULE getImageBase() const;
+	Module getImageBase() const;
 
 private:  
 	PEParser m_file_parser;

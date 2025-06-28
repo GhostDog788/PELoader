@@ -17,7 +17,7 @@ int main()
 		auto TestTls = reinterpret_cast<void(*)()>(res);
 		TestTls();
 
-		PELoader::freeLibrary(reinterpret_cast<MemoryLocation>(lib));
+		PELoader::freeLibrary(lib);
 	}
 	catch (const ParserException& e) {
 		std::cerr << "ParserException: " << e.what() << std::endl;
