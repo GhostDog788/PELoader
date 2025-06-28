@@ -180,13 +180,11 @@ void PELoader::resolveTLS()
 
    // call TLS callbacks if any
    auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);  
-   if (!callbacks)  
-       return;  
    for (PIMAGE_TLS_CALLBACK* p = callbacks; *p != nullptr; ++p) {  
        PIMAGE_TLS_CALLBACK callback = *p;  
        callback(m_image_base, DLL_PROCESS_ATTACH, nullptr);  
    }
-   // [Should call the other three reasons when needed as well]
+   // [Should call the thread attach and detach as well]
 }
 
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
@@ -206,12 +204,26 @@ void PELoader::freeTLS()
 		return; // No TLS directory found  
 	}
 
+	// call TLS callbacks if any
+	auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);
+	for (PIMAGE_TLS_CALLBACK* p = callbacks; *p != nullptr; ++p) {
+		PIMAGE_TLS_CALLBACK callback = *p;
+		callback(m_image_base, DLL_PROCESS_DETACH, nullptr);
+	}
+
+	// free static TLS data
 	DWORD* tls_index = reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex);
 
 	auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + TLS_PTR_OFFSET);
+	VirtualFree(reinterpret_cast<void*>((*ptr_to_tls_ptr)[*tls_index]), 0, MEM_RELEASE);
 	(*ptr_to_tls_ptr)[*tls_index] = 0; // This is the core line that prevents the loader to crash undeterminably at the end of the process
 
 	TlsFree(*tls_index);
+}
+
+void PELoader::freeImageMemory()
+{
+	VirtualFree(reinterpret_cast<void*>(m_image_base), 0, MEM_RELEASE);
 }
 
 DWORD PELoader::sectionCharacteristicsToProtect(DWORD characteristics)
@@ -268,6 +280,8 @@ BOOL PELoader::freeLibrary(PELoader::Module image)
 	PELoader loader(image);
 
 	loader.freeTLS();
+	loader.freeImageMemory();
+
 	return true;
 }
 

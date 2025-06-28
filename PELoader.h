@@ -40,6 +40,7 @@ private:
 	void callEntryPoint(DWORD ul_reason_for_call);
 
 	void freeTLS();
+	void freeImageMemory();
 
 	static DWORD sectionCharacteristicsToProtect(DWORD characteristics);
 };
