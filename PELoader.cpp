@@ -1,6 +1,12 @@
 #include "PELoader.h"
 #include <stdexcept>
 
+#ifdef _WIN64
+#define TLS_PTR_OFFSET 0x58
+#else
+#define TLS_PTR_OFFSET 0x2c
+#endif // _WIN64
+
 
 PELoader::PELoader(MemoryLocation file_image)
 	: m_file_parser(file_image, PEParser::ImageLocation::FILE)
@@ -169,7 +175,7 @@ void PELoader::resolveTLS()
 
    // set this module's tls data to our allocated data
    // [You need to do this for every thread in the process, for now I do this only for the thread how called my PE Loader]
-   auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+   auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + TLS_PTR_OFFSET);
    (*ptr_to_tls_ptr)[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
 
    // call TLS callbacks if any
@@ -202,7 +208,7 @@ void PELoader::freeTLS()
 
 	DWORD* tls_index = reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex);
 
-	auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+	auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + TLS_PTR_OFFSET);
 	(*ptr_to_tls_ptr)[*tls_index] = 0; // This is the core line that prevents the loader to crash undeterminably at the end of the process
 
 	TlsFree(*tls_index);

@@ -7,7 +7,11 @@
 
 int main()
 {
+#ifdef _WIN64
+	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\x64\\Release\\TestDLL.dll";
+#else
 	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\TestDLL.dll";
+#endif // _WIN64
 	try {
 		Buffer buffer = IoUtils::readFile(filename);
 		//auto lib = LoadLibrary(filename);
