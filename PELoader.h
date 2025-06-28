@@ -7,6 +7,7 @@
 class PELoader {  
 public:  
 	static HMODULE loadLibrary(MemoryLocation image);
+	static BOOL freeLibrary(MemoryLocation image);
 	static FARPROC getProcAddress(HMODULE image, LPCSTR proc_name);
 
 	PELoader(MemoryLocation image);
@@ -25,8 +26,9 @@ private:
 	void resolveRelocations();
 	void resolveTLS();
 
-
 	void callEntryPoint(DWORD ul_reason_for_call);
+
+	void freeTLS();
 
 	static DWORD sectionCharacteristicsToProtect(DWORD characteristics);
 };

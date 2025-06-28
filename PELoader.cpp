@@ -4,7 +4,7 @@
 
 PELoader::PELoader(MemoryLocation image)
 	: m_file_parser(image, PEParser::ImageLocation::FILE)
-	, m_memory_parser(m_image_base, PEParser::ImageLocation::MEMORY)
+	, m_memory_parser(image, PEParser::ImageLocation::MEMORY)
 {
 }
 
@@ -163,6 +163,7 @@ void PELoader::resolveTLS()
 
    size_t tls_data_size = tls_directory->SizeOfZeroFill + (tls_directory->EndAddressOfRawData - tls_directory->StartAddressOfRawData);  
 
+   // allocate starting tls data
    void* tls_data = VirtualAlloc(0, tls_data_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
    if (tls_data == nullptr) {
 	   throw std::runtime_error("Failed to allocate TLS data");
@@ -173,22 +174,21 @@ void PELoader::resolveTLS()
        reinterpret_cast<void*>(tls_directory->StartAddressOfRawData),  
        tls_data_size - tls_directory->SizeOfZeroFill  
    );
-   auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR*>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
-   //auto tls_vector = reinterpret_cast<UINT_PTR*>(VirtualAlloc(0, 1000 * sizeof(UINT_PTR), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
-   //if (tls_vector == nullptr) {
-   //   throw std::runtime_error("Failed to allocate TLS vector");
-   //}
-   //ZeroMemory(tls_vector, 1000 * sizeof(UINT_PTR)); // Initialize the TLS vector to zero
-   //*ptr_to_tls_ptr = reinterpret_cast<UINT_PTR>(tls_vector);
-   reinterpret_cast<DWORD*>(*ptr_to_tls_ptr)[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
 
+   // set this module's tls data to our allocated data
+   // [You need to do this for every thread in the process, for now I do this only for the thread how called my PE Loader]
+   auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+   (*ptr_to_tls_ptr)[*tls_index] = reinterpret_cast<UINT_PTR>(tls_data);
+
+   // call TLS callbacks if any
    auto callbacks = reinterpret_cast<PIMAGE_TLS_CALLBACK*>(tls_directory->AddressOfCallBacks);  
    if (!callbacks)  
        return;  
    for (PIMAGE_TLS_CALLBACK* p = callbacks; *p != nullptr; ++p) {  
        PIMAGE_TLS_CALLBACK callback = *p;  
        callback(m_image_base, DLL_PROCESS_ATTACH, nullptr);  
-   }  
+   }
+   // [Should call the other three reasons when needed as well]
 }
 
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
@@ -199,6 +199,21 @@ void PELoader::callEntryPoint(DWORD ul_reason_for_call)
 	DllMainFunc dllMain = reinterpret_cast<DllMainFunc>(address);
 
 	dllMain(reinterpret_cast<HINSTANCE>(address), ul_reason_for_call, nullptr);
+}
+
+void PELoader::freeTLS()
+{
+	IMAGE_TLS_DIRECTORY* tls_directory = m_memory_parser.getTLSDirectory();
+	if (tls_directory == nullptr) {
+		return; // No TLS directory found  
+	}
+
+	DWORD* tls_index = reinterpret_cast<DWORD*>(tls_directory->AddressOfIndex);
+
+	auto ptr_to_tls_ptr = reinterpret_cast<UINT_PTR**>(reinterpret_cast<char*>(NtCurrentTeb()) + 0x2C);
+	(*ptr_to_tls_ptr)[*tls_index] = 0; // This is the core line that prevents the loader to crash undeterminably at the end of the process
+
+	TlsFree(*tls_index);
 }
 
 DWORD PELoader::sectionCharacteristicsToProtect(DWORD characteristics)
@@ -248,6 +263,14 @@ HMODULE PELoader::loadLibrary(MemoryLocation image)
 	loader.callEntryPoint(DLL_PROCESS_ATTACH);
 
 	return loader.getImageBase();
+}
+
+BOOL PELoader::freeLibrary(MemoryLocation image)
+{
+	PELoader loader(image);
+
+	loader.freeTLS();
+	return true;
 }
 
 FARPROC PELoader::getProcAddress(HMODULE image, LPCSTR proc_name)

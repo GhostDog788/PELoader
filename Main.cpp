@@ -16,7 +16,8 @@ int main()
 		auto res = PELoader::getProcAddress(lib, "TestTls");
 		auto TestTls = reinterpret_cast<void(*)()>(res);
 		TestTls();
-		int y = 5;
+
+		PELoader::freeLibrary(reinterpret_cast<MemoryLocation>(lib));
 	}
 	catch (const ParserException& e) {
 		std::cerr << "ParserException: " << e.what() << std::endl;
