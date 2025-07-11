@@ -1,4 +1,5 @@
 #include "PELoader.h"
+#include "VEHtoSEH.h"
 #include <stdexcept>
 
 #ifdef _WIN64
@@ -187,6 +188,15 @@ void PELoader::resolveTLS()
    // [Should call the thread attach and detach as well]
 }
 
+void PELoader::resolveExceptions()
+{
+#ifdef _WIN64
+
+#else
+	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&DispatchStructuredException);
+#endif
+}
+
 void PELoader::callEntryPoint(DWORD ul_reason_for_call)
 {
 	using DllMainFunc = BOOL(WINAPI*)(HINSTANCE, DWORD, LPVOID);
@@ -219,6 +229,16 @@ void PELoader::freeTLS()
 	(*ptr_to_tls_ptr)[*tls_index] = 0; // This is the core line that prevents the loader to crash undeterminably at the end of the process
 
 	TlsFree(*tls_index);
+}
+
+void PELoader::freeExceptions()
+{
+#ifdef _WIN64
+
+#else
+	RemoveVectoredExceptionHandler(DispatchStructuredException);
+	// there may be several instances of this handler registered so I don't know how the remove function will handle that
+#endif
 }
 
 void PELoader::freeImageMemory()
@@ -258,6 +278,7 @@ PELoader::Module PELoader::loadLibrary(MemoryLocation image)
 	loader.resolveImports();
 	loader.resolveRelocations();
 	loader.resolveTLS();
+	loader.resolveExceptions();
 
 	// [V] allocate memory for the entire image as R/W
 	// [V] copy headers: DOS , NT, sections
@@ -267,7 +288,7 @@ PELoader::Module PELoader::loadLibrary(MemoryLocation image)
 	// [V] resolve relocations
 	// [V] resolve exports (getProcAddress)
 	// [V] resolve TLS (if present)
-	// [ ] resolve exception handlers
+	// [V] resolve exception handlers
 	// 
 	// [V] call entry point
 	loader.callEntryPoint(DLL_PROCESS_ATTACH);
@@ -279,6 +300,7 @@ BOOL PELoader::freeLibrary(PELoader::Module image)
 {
 	PELoader loader(image);
 
+	loader.freeExceptions();
 	loader.freeTLS();
 	loader.freeImageMemory();
 

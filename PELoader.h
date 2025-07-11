@@ -36,9 +36,11 @@ private:
 	void resolveImports();
 	void resolveRelocations();
 	void resolveTLS();
+	void resolveExceptions();
 
 	void callEntryPoint(DWORD ul_reason_for_call);
 
+	void freeExceptions();
 	void freeTLS();
 	void freeImageMemory();
 

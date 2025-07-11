@@ -21,6 +21,13 @@ int main()
 		auto TestTls = reinterpret_cast<void(*)()>(res);
 		TestTls();
 
+#ifndef _WIN64
+		res = PELoader::getProcAddress(lib, "TestException");
+		auto TestException = reinterpret_cast<void(*)()>(res);
+		TestException();
+#endif
+
+		std::cout << "Freeing library" << std::endl;
 		PELoader::freeLibrary(lib);
 	}
 	catch (const ParserException& e) {
