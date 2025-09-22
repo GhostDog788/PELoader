@@ -77,11 +77,13 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>Async</ExceptionHandling>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ntdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -140,16 +142,21 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="PELoader.cpp" />
     <ClCompile Include="PEParser.cpp" />
+    <ClCompile Include="PersonalityRoutine.cpp" />
+    <ClCompile Include="RtlUnwindUnSafe.cpp" />
+    <ClCompile Include="VehDispatcher.cpp" />
     <ClCompile Include="VEHtoSEH.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Buffer.h" />
     <ClInclude Include="HandleGuard.h" />
+    <ClInclude Include="InternalStructs.h" />
     <ClInclude Include="IoUtils.h" />
     <ClInclude Include="LocationTypes.h" />
     <ClInclude Include="ParserException.h" />
     <ClInclude Include="PELoader.h" />
     <ClInclude Include="PEParser.h" />
+    <ClInclude Include="ShadowSEH.h" />
     <ClInclude Include="VEHtoSEH.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

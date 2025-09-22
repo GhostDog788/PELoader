@@ -13,6 +13,8 @@ int main()
 	auto filename = L"C:\\Users\\dor\\source\\repos\\PELoader\\Release\\TestDLL.dll";
 #endif // _WIN64
 	try {
+		auto var = __security_cookie;
+		std::cout << "My exe security cookie: " << std::hex << var << std::dec << std::endl;
 		Buffer buffer = IoUtils::readFile(filename);
 		//auto lib = LoadLibrary(filename);
 		auto lib = PELoader::loadLibrary(buffer.data());
@@ -20,6 +22,10 @@ int main()
 		auto res = PELoader::getProcAddress(lib, "TestTls");
 		auto TestTls = reinterpret_cast<void(*)()>(res);
 		TestTls();
+
+		res = PELoader::getProcAddress(lib, "GetGSCookie");
+		auto GetGSCookie = reinterpret_cast<uintptr_t(*)()>(res);
+		std::cout << "Test dll's security cookie: " << std::hex << GetGSCookie() << std::dec << std::endl;
 
 #ifndef _WIN64
 		res = PELoader::getProcAddress(lib, "TestException");

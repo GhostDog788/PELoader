@@ -9,27 +9,7 @@
 * Teq 01.2015-02.2020
 */
 #ifndef _WIN64
-#include <windows.h>
-#include <WinNT.h>
-#include <excpt.h>
-
-// from \crt\src\eh\i386\trnsctrl.cpp
-#define EXCEPTION_UNWINDING 0x2         /* Unwind is in progress */
-#define EXCEPTION_EXIT_UNWIND 0x4       /* Exit unwind is in progress */
-#define EXCEPTION_STACK_INVALID 0x8     /* Stack out of limits or unaligned */
-#define EXCEPTION_NESTED_CALL 0x10      /* Nested exception handler call */
-#define EXCEPTION_TARGET_UNWIND 0x20    /* Target unwind in progress */
-#define EXCEPTION_COLLIDED_UNWIND 0x40  /* Collided exception handler call */
-
-extern "C" NTSYSAPI VOID NTAPI RtlRaiseException(PEXCEPTION_RECORD ExceptionRecord);
-extern "C" NTSYSAPI NTSTATUS NTAPI NtContinue(IN PCONTEXT ThreadContext, IN BOOLEAN RaiseAlert );
-extern "C" NTSYSAPI NTSTATUS NTAPI NtRaiseException(IN PEXCEPTION_RECORD ExceptionRecord, IN PCONTEXT ThreadContext, IN BOOLEAN HandleException);
-
-typedef struct EXCEPTION_REGISTRATION
-{
-	EXCEPTION_REGISTRATION* nextframe;
-	PEXCEPTION_ROUTINE handler;
-} *PEXCEPTION_REGISTRATION;
+#include "InternalStructs.h"
 
 __declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead()
 {

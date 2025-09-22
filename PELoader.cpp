@@ -1,5 +1,6 @@
 #include "PELoader.h"
 #include "VEHtoSEH.h"
+#include "ShadowSEH.h"
 #include <stdexcept>
 
 #ifdef _WIN64
@@ -193,7 +194,7 @@ void PELoader::resolveExceptions()
 #ifdef _WIN64
 
 #else
-	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&DispatchStructuredException);
+	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&DispatchStructuredException2);
 #endif
 }
 
