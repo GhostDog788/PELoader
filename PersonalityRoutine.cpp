@@ -34,15 +34,27 @@ LONG __fastcall _EH4_CallFilterFunc(
 	//return FilterFunc();
 }
 
-void __declspec(noreturn) __fastcall _EH4_TransferToHandler(
-    _In_ PEXCEPTION_HANDLER_X86 HandlerAddress,
-    _In_ PCHAR                  FramePointer
+__declspec(naked)
+__declspec(noreturn)
+void __fastcall _EH4_TransferToHandler(
+    _In_ PEXCEPTION_HANDLER_X86 HandlerAddress, // ecx
+    _In_ PCHAR                  FramePointer // edx
 )
 {
-	// Optional TODO: Implement _NLG_Notify for debugger notification
-	return HandlerAddress();
-}
+    // Optional TODO: Implement _NLG_Notify for debugger notification
+    __asm {
+        mov ebp, edx
+        mov esp, dword ptr[edx - 0x18]   // savedEsp (frame - 0x4 * 6)
 
+        xor eax, eax
+        xor ebx, ebx
+        xor edx, edx
+        xor esi, esi
+        xor edi, edi
+        // jump into handler (noreturn)
+        jmp ecx
+    }
+}
 
 __declspec(naked) void __fastcall _EH4_GlobalUnwind2(
     _In_opt_ PEXCEPTION_REGISTRATION_RECORD  EstablisherFrame,    // ecx (fastcall)
