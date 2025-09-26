@@ -194,7 +194,7 @@ void PELoader::resolveExceptions()
 #ifdef _WIN64
 
 #else
-	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&DispatchStructuredException2);
+	EnableSEHoverVEH();
 #endif
 }
 
@@ -237,8 +237,7 @@ void PELoader::freeExceptions()
 #ifdef _WIN64
 
 #else
-	RemoveVectoredExceptionHandler(DispatchStructuredException);
-	// there may be several instances of this handler registered so I don't know how the remove function will handle that
+	DisableSEHoverVEH();
 #endif
 }
 

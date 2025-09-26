@@ -9,24 +9,8 @@
 * Teq 01.2015-02.2020
 */
 #ifndef _WIN64
-#include "InternalStructs.h"
+#include "ShadowSEH.h"
 
-__declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead()
-{
-	__asm mov eax, dword ptr fs:[0]
-	__asm retn
-}
-
-EXCEPTION_DISPOSITION NestedExceptionHandler(EXCEPTION_RECORD *ExceptionRecord, PLONG pEstablisherFrame, CONTEXT *ContextRecord, PLONG pDispatcherContext)
-{
-	if (ExceptionRecord->ExceptionFlags& (EXCEPTION_UNWINDING|EXCEPTION_EXIT_UNWIND))
-		return ExceptionContinueSearch;
-	else 
-	{
-		*pDispatcherContext = *(pEstablisherFrame+2); /* move previously saved EstablisherFrame from [pEstablisherFrame+8h] */
-		return ExceptionNestedException;
-	}
-} 
 
 EXCEPTION_DISPOSITION SafeExecuteHandler(EXCEPTION_RECORD *ExceptionRecord, PVOID EstablisherFrame, CONTEXT *ContextRecord, PVOID DispatcherContext, PEXCEPTION_ROUTINE pHandler)
 {
@@ -109,7 +93,7 @@ _declspec(noreturn) VOID CALLBACK DispatchStructuredException(PEXCEPTION_POINTER
                 RtlRaiseException(&nextEx);
                 break;
 		}
-		Registration = Registration->nextframe;
+		Registration = Registration->prev;
 	}
 
 	/* 

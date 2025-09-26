@@ -1,8 +1,9 @@
 #ifndef _WIN64
 #include "InternalStructs.h"
 #include <iostream>
+#include "ShadowSEH.h"
 
-__declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead2()
+_declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead()
 {
 	__asm mov eax, dword ptr fs : [0]
 		__asm retn
@@ -10,7 +11,30 @@ __declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead2()
 
 void EnableSEHoverVEH()
 {
-	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&DispatchStructuredException2);
+	AddVectoredExceptionHandler(0, (PVECTORED_EXCEPTION_HANDLER)&ShadowDispatchStructuredException);
+}
+
+void DisableSEHoverVEH()
+{
+	RemoveVectoredExceptionHandler(ShadowDispatchStructuredException);
+	// there may be several instances of this handler registered so I don't know how the remove function will handle that
+}
+
+bool IsReadable(void* addr) {
+	MEMORY_BASIC_INFORMATION mbi;
+	if (!VirtualQuery(addr, &mbi, sizeof(mbi)))
+		return false;
+
+	// Must be committed memory
+	if (mbi.State != MEM_COMMIT)
+		return false;
+
+	// Must have read access
+	DWORD protect = mbi.Protect & 0xff;
+	if (protect == PAGE_NOACCESS || protect == PAGE_EXECUTE)
+		return false;
+
+	return true;
 }
 
 PUINT_PTR getGSCookiePointerFromHandler(PEXCEPTION_ROUTINE except_handler4_address)
@@ -19,7 +43,7 @@ PUINT_PTR getGSCookiePointerFromHandler(PEXCEPTION_ROUTINE except_handler4_addre
 	return  reinterpret_cast<PUINT_PTR>(*reinterpret_cast<PUINT_PTR>(func + 0x20));
 }
 
-EXCEPTION_DISPOSITION NestedExceptionHandler2(EXCEPTION_RECORD* ExceptionRecord, PLONG pEstablisherFrame, CONTEXT* ContextRecord, PLONG pDispatcherContext)
+EXCEPTION_DISPOSITION NTAPI NestedExceptionHandler(EXCEPTION_RECORD* ExceptionRecord, PLONG pEstablisherFrame, CONTEXT* ContextRecord, PLONG pDispatcherContext)
 {
 	if (ExceptionRecord->ExceptionFlags & (EXCEPTION_UNWINDING | EXCEPTION_EXIT_UNWIND))
 		return ExceptionContinueSearch;
@@ -30,7 +54,7 @@ EXCEPTION_DISPOSITION NestedExceptionHandler2(EXCEPTION_RECORD* ExceptionRecord,
 	}
 }
 
-EXCEPTION_DISPOSITION SafeExecuteHandler2(EXCEPTION_RECORD* ExceptionRecord, PVOID EstablisherFrame, CONTEXT* ContextRecord, PVOID DispatcherContext, PEXCEPTION_ROUTINE pHandler)
+EXCEPTION_DISPOSITION SafeExecuteMyHandler(EXCEPTION_RECORD* ExceptionRecord, PVOID EstablisherFrame, CONTEXT* ContextRecord, PVOID DispatcherContext, PEXCEPTION_ROUTINE pHandler)
 {
 	__asm {
 		/*
@@ -41,14 +65,21 @@ EXCEPTION_DISPOSITION SafeExecuteHandler2(EXCEPTION_RECORD* ExceptionRecord, PVO
 			in \crt\src\eh\i386\trnsctrl.cpp and view _JumpToContinuation)
 		*/
 		push	EstablisherFrame        /* save EstablisherFrame for nested exception */
-		push	NestedExceptionHandler2
+		push	NestedExceptionHandler
 		push	dword ptr fs : [0]
 		mov		dword ptr fs : [0] , esp
 	}
-	std::cout << "GSCookiePointer: " << std::hex << getGSCookiePointerFromHandler(pHandler) << std::dec << std::endl;
-	std::cout << "GSCookie: " << std::hex << *getGSCookiePointerFromHandler(pHandler) << std::dec << std::endl;
-	EXCEPTION_DISPOSITION Disposition = _except_handler5(ExceptionRecord, (PEXCEPTION_REGISTRATION_RECORD)EstablisherFrame, ContextRecord, DispatcherContext, getGSCookiePointerFromHandler(pHandler));
-
+	EXCEPTION_DISPOSITION Disposition;
+	auto cookiePointer = getGSCookiePointerFromHandler(pHandler);
+	std::cout << "Handler: " << std::hex << (void*)pHandler << std::dec << std::endl;
+	if (IsReadable(cookiePointer)) {
+		std::cout << "GSCookiePointer: " << std::hex << cookiePointer << std::dec << std::endl;
+		std::cout << "GSCookie: " << std::hex << *cookiePointer << std::dec << std::endl;
+		Disposition = _except_handler5(ExceptionRecord, (PEXCEPTION_REGISTRATION_RECORD)EstablisherFrame, ContextRecord, DispatcherContext, cookiePointer);
+	}
+	else {
+		Disposition = pHandler(ExceptionRecord, EstablisherFrame, ContextRecord, DispatcherContext);
+	}
 	__asm {
 		mov		esp, dword ptr fs : [0]
 		pop		dword ptr fs : [0]
@@ -57,16 +88,16 @@ EXCEPTION_DISPOSITION SafeExecuteHandler2(EXCEPTION_RECORD* ExceptionRecord, PVO
 	return Disposition;
 }
 
-_declspec(noreturn) VOID CALLBACK DispatchStructuredException2(PEXCEPTION_POINTERS ExceptionInfo)
+_declspec(noreturn) VOID CALLBACK ShadowDispatchStructuredException(PEXCEPTION_POINTERS ExceptionInfo)
 {
 	PCONTEXT ctx = ExceptionInfo->ContextRecord;
 	PEXCEPTION_RECORD ex = ExceptionInfo->ExceptionRecord;
-	PEXCEPTION_REGISTRATION Registration = GetRegistrationHead2();
+	PEXCEPTION_REGISTRATION Registration = GetRegistrationHead();
 	PEXCEPTION_REGISTRATION NestedRegistration = 0, DispatcherContext = 0;
 
 	while ((LONG)Registration != -1)    /* -1 means end of chain */
 	{
-		EXCEPTION_DISPOSITION Disposition = SafeExecuteHandler2(ex, Registration, ctx, &DispatcherContext, Registration->handler);
+		EXCEPTION_DISPOSITION Disposition = SafeExecuteMyHandler(ex, Registration, ctx, &DispatcherContext, Registration->handler);
 
 		if (NestedRegistration == Registration)
 		{
@@ -112,7 +143,7 @@ _declspec(noreturn) VOID CALLBACK DispatchStructuredException2(PEXCEPTION_POINTE
 			RtlRaiseException(&nextEx);
 			break;
 		}
-		Registration = Registration->nextframe;
+		Registration = Registration->prev;
 	}
 
 	/*

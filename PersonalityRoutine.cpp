@@ -1,5 +1,5 @@
 #ifndef _WIN64
-#include "InternalStructs.h"
+#include "ShadowSEH.h"
 
 //#pragma warning(disable: 4132)  // communal object is intentionally const
 //void(__cdecl* const _pDestructExceptionObject)(
@@ -263,7 +263,7 @@ _except_handler5(
                         mov target_ip, eax
                     }
 					RtlUnwindUnSafe(
-						&RegistrationNode->SubRecord,
+						(PEXCEPTION_REGISTRATION) & RegistrationNode->SubRecord,
                         target_ip,
 						ExceptionRecord,
 						NULL

@@ -1,9 +1,14 @@
 #pragma once
 
-#include "ShadowSEH.h"
+#include <windows.h>
 #include <WinNT.h>
 #include <excpt.h>
 
+
+#define STATUS_UNWINDING 0x80000002L
+#define STATUS_COLLIDED_UNWIND 0x80000003L
+#define STATUS_INVALID_UNWIND_TARGET 0xC0000029L
+#define STATUS_BAD_STACK 0xC0000028L
 
 // from \crt\src\eh\i386\trnsctrl.cpp
 #define EXCEPTION_UNWINDING 0x2         /* Unwind is in progress */
@@ -81,6 +86,6 @@ typedef struct _EH4_EXCEPTION_REGISTRATION_RECORD
 
 typedef struct EXCEPTION_REGISTRATION
 {
-    EXCEPTION_REGISTRATION* nextframe;
+    EXCEPTION_REGISTRATION* prev;
     PEXCEPTION_ROUTINE handler;
 } *PEXCEPTION_REGISTRATION;
