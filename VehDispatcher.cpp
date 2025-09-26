@@ -1,6 +1,4 @@
 #ifndef _WIN64
-#include "InternalStructs.h"
-#include <iostream>
 #include "ShadowSEH.h"
 
 _declspec(naked) EXCEPTION_REGISTRATION* GetRegistrationHead()
@@ -71,10 +69,7 @@ EXCEPTION_DISPOSITION SafeExecuteMyHandler(EXCEPTION_RECORD* ExceptionRecord, PV
 	}
 	EXCEPTION_DISPOSITION Disposition;
 	auto cookiePointer = getGSCookiePointerFromHandler(pHandler);
-	std::cout << "Handler: " << std::hex << (void*)pHandler << std::dec << std::endl;
 	if (IsReadable(cookiePointer)) {
-		std::cout << "GSCookiePointer: " << std::hex << cookiePointer << std::dec << std::endl;
-		std::cout << "GSCookie: " << std::hex << *cookiePointer << std::dec << std::endl;
 		Disposition = _except_handler5(ExceptionRecord, (PEXCEPTION_REGISTRATION_RECORD)EstablisherFrame, ContextRecord, DispatcherContext, cookiePointer);
 	}
 	else {
@@ -155,4 +150,4 @@ _declspec(noreturn) VOID CALLBACK ShadowDispatchStructuredException(PEXCEPTION_P
 	NtRaiseException(ex, ctx, false);
 }
 
-#endif
+#endif // _WIN64

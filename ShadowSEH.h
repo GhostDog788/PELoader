@@ -57,4 +57,4 @@ VOID RtlUnwindUnSafe(
     DWORD _esp
 );
 
-#endif
+#endif // _WIN64

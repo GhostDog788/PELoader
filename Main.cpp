@@ -14,7 +14,6 @@ int main()
 #endif // _WIN64
 	try {
 		auto var = __security_cookie;
-		std::cout << "My exe security cookie: " << std::hex << var << std::dec << std::endl;
 		Buffer buffer = IoUtils::readFile(filename);
 		//auto lib = LoadLibrary(filename);
 		auto lib = PELoader::loadLibrary(buffer.data());
@@ -25,8 +24,6 @@ int main()
 
 		res = PELoader::getProcAddress(lib, "GetGSCookie");
 		auto GetGSCookie = reinterpret_cast<uintptr_t(*)()>(res);
-		std::cout << "Test dll's security cookie: " << std::hex << GetGSCookie() << std::dec << std::endl;
-
 #ifndef _WIN64
 		res = PELoader::getProcAddress(lib, "TestException");
 		auto TestException = reinterpret_cast<void(*)()>(res);

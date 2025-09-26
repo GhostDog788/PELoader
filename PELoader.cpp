@@ -1,5 +1,4 @@
 #include "PELoader.h"
-#include "VEHtoSEH.h"
 #include "ShadowSEH.h"
 #include <stdexcept>
 
@@ -280,17 +279,6 @@ PELoader::Module PELoader::loadLibrary(MemoryLocation image)
 	loader.resolveTLS();
 	loader.resolveExceptions();
 
-	// [V] allocate memory for the entire image as R/W
-	// [V] copy headers: DOS , NT, sections
-	// [V] copy each section to memory, change permissions to characteristics
-	// 
-	// [V] resolve imports
-	// [V] resolve relocations
-	// [V] resolve exports (getProcAddress)
-	// [V] resolve TLS (if present)
-	// [V] resolve exception handlers
-	// 
-	// [V] call entry point
 	loader.callEntryPoint(DLL_PROCESS_ATTACH);
 
 	return loader.getImageBase();

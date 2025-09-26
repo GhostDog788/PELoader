@@ -1,3 +1,4 @@
+#ifndef _WIN64
 #include "ShadowSEH.h"
 
 #define BAD_POINTER ((PVOID)-1)
@@ -185,3 +186,5 @@ VOID RtlUnwindUnSafe(
 		NtRaiseException(ExceptionRecord, &context, 0);
 
 }
+
+#endif // _WIN64

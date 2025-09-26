@@ -1,6 +1,9 @@
 #ifndef _WIN64
 #include "ShadowSEH.h"
 
+
+// This is used for destructing the cpp object of the exception. Haven't implemented that
+// Would require reimplementing DestructExceptionObject
 //#pragma warning(disable: 4132)  // communal object is intentionally const
 //void(__cdecl* const _pDestructExceptionObject)(
 //    PEXCEPTION_RECORD   pExcept,
@@ -10,8 +13,8 @@
 #define EH_EXCEPTION_NUMBER ('msc' | 0xE0000000)
 
 LONG __fastcall _EH4_CallFilterFunc(
-    _In_ PEXCEPTION_FILTER_X86  FilterFunc,
-    _In_ PCHAR                  FramePointer
+    _In_ PEXCEPTION_FILTER_X86  FilterFunc, // ecx
+    _In_ PCHAR                  FramePointer // edx
 )
 {
     __asm {
@@ -19,19 +22,18 @@ LONG __fastcall _EH4_CallFilterFunc(
         push esi
         push edi
         push ebx
-        mov ebp, edx
+        mov ebp, edx // change stack to start of try. so local vars are accessible from the filter expression 
         xor eax, eax
         xor ebx, ebx
         xor edx, edx
         xor esi, esi
         xor edi, edi
-        call ecx
+        call ecx // call FilterFunc with pushed params
         pop ebx
         pop edi
         pop esi
         pop ebp
     }
-	//return FilterFunc();
 }
 
 __declspec(naked)
@@ -57,8 +59,8 @@ void __fastcall _EH4_TransferToHandler(
 }
 
 __declspec(naked) void __fastcall _EH4_GlobalUnwind2(
-    _In_opt_ PEXCEPTION_REGISTRATION_RECORD  EstablisherFrame,    // ecx (fastcall)
-    _In_opt_ PEXCEPTION_RECORD               ExceptionRecord      // edx (fastcall)
+    _In_opt_ PEXCEPTION_REGISTRATION_RECORD  EstablisherFrame, // ecx
+    _In_opt_ PEXCEPTION_RECORD               ExceptionRecord // edx
 )
 {
     __asm {
@@ -66,9 +68,7 @@ __declspec(naked) void __fastcall _EH4_GlobalUnwind2(
         pushad  // push EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI (saves ECX/EDX too)
         pushfd  // push EFLAGS
 
-        // ECX = EstablisherFrame (fastcall), EDX = ExceptionRecord (fastcall)
-        // RtlUnwindUnSafe( TargetFrame, TargetIp, ExceptionRecord, ReturnValue )
-        // push in reverse order:
+        // Call RtlUnwindUnSafe
 		push esp // added param so we can restore ESP in RtlUnwindUnSafe
         push dword ptr 0 // ReturnValue = NULL
         push edx  // ExceptionRecord
@@ -143,8 +143,7 @@ void __fastcall _EH4_LocalUnwind(
 *_except_handler5 - actual SEH implementation with no gs checks. uses our own RtlUnwind
 *
 *Purpose:
-*   Implement structured exception handling for functions which have __try/
-*   __except/__finally.
+*   Implement structured exception handling for functions which have __try/__except/__finally.
 *
 *   Call exception and termination handlers as necessary, based on the current
 *   execution point within the function.
@@ -226,7 +225,7 @@ _except_handler5(
         (RegistrationNode->EncodedScopeTable ^ *CookiePointer);
 
     //
-    // Security checks have passed, begin actual exception handling.
+    // Locals have been initiated, begin actual exception handling.
     //
 
     if (IS_DISPATCHING(ExceptionRecord->ExceptionFlags))
