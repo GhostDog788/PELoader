@@ -43,6 +43,36 @@ void __declspec(noreturn) __fastcall _EH4_TransferToHandler(
 	return HandlerAddress();
 }
 
+
+__declspec(naked) void __fastcall _EH4_GlobalUnwind2(
+    _In_opt_ PEXCEPTION_REGISTRATION_RECORD  EstablisherFrame,    // ecx (fastcall)
+    _In_opt_ PEXCEPTION_RECORD               ExceptionRecord      // edx (fastcall)
+)
+{
+    __asm {
+        // ---- save full volatile state ----
+        pushad  // push EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI (saves ECX/EDX too)
+        pushfd  // push EFLAGS
+
+        // ECX = EstablisherFrame (fastcall), EDX = ExceptionRecord (fastcall)
+        // RtlUnwindUnSafe( TargetFrame, TargetIp, ExceptionRecord, ReturnValue )
+        // push in reverse order:
+		push esp // added param so we can restore ESP in RtlUnwindUnSafe
+        push dword ptr 0 // ReturnValue = NULL
+        push edx  // ExceptionRecord
+        push offset ReturnPoint_0  // TargetIp
+        push ecx  // TargetFrame (EstablisherFrame)
+
+        call RtlUnwindUnSafe
+
+        ReturnPoint_0 :
+        // ---- restore full volatile state ----
+        popfd  // restore EFLAGS
+        popad  // restore registers (including ESP restored to pre-pushad)
+        ret
+    }
+}
+
 void __fastcall _EH4_LocalUnwind(
     _In_ PEXCEPTION_REGISTRATION_RECORD  EstablisherFrame,
     _In_ ULONG                           TargetLevel,
@@ -257,18 +287,11 @@ _except_handler5(
                     // Unwind all registration nodes below this one, then unwind
                     // the nested __try levels.
                     //
-                    void* target_ip;
-                    __asm {
-                        mov eax, offset ReturnPoint_0
-                        mov target_ip, eax
-                    }
-					RtlUnwindUnSafe(
-						(PEXCEPTION_REGISTRATION) & RegistrationNode->SubRecord,
-                        target_ip,
-						ExceptionRecord,
-						NULL
-					);
-                    ReturnPoint_0:
+                    _EH4_GlobalUnwind2(
+                        &RegistrationNode->SubRecord,
+                        ExceptionRecord
+                    );
+
 
                     if (RegistrationNode->TryLevel != TryLevel)
                     {

@@ -85,7 +85,8 @@ VOID RtlUnwindUnSafe(
     IN PEXCEPTION_REGISTRATION TargetFrame,
     IN PVOID TargetIp,
     IN PEXCEPTION_RECORD ExceptionRecord,
-    IN DWORD ReturnValue
+    IN DWORD ReturnValue,
+	DWORD _esp
 ) 
 {
 	DWORD stackUserBase;
@@ -104,9 +105,9 @@ VOID RtlUnwindUnSafe(
 
 	RtlpCaptureContext(&context);
 	context.Eip = (DWORD)TargetIp;
-	context.Ebp = (DWORD)TargetFrame;
+	context.Esp = _esp;
 
-	context.Esp += 0x10;
+	//context.Esp += 0x10;
 	context.Eax = ReturnValue;
 
 	PEXCEPTION_REGISTRATION pExcptRegHead = GetRegistrationHead();  // Retrieve FS:[0]

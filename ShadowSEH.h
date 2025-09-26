@@ -53,7 +53,8 @@ VOID RtlUnwindUnSafe(
     IN PEXCEPTION_REGISTRATION TargetFrame,
     IN PVOID TargetIp,
     IN PEXCEPTION_RECORD ExceptionRecord,
-    IN DWORD ReturnValue
+    IN DWORD ReturnValue,
+    DWORD _esp
 );
 
 #endif
